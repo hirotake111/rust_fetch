@@ -1,11 +1,15 @@
-# rust_dns_parser
+# fetch
 
-DNS parser in Rust, with no dependencies
-
-## API
+A simple HTTP client with no 3rd party library dependencies.
 
 ## Usage
 
 ```bash
-cargo run --example request_a   # Request A record
+fetch example.com
 ```
+
+## API
+
+## TODO
+
+- write API doc
