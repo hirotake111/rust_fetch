@@ -1,4 +1,20 @@
 use std::fmt::Display;
+use std::net::{IpAddr, Ipv4Addr};
+
+///
+/// DNS resolver struct that resolve IP address for passed URL
+///
+pub struct Resolver {}
+
+impl Resolver {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn resolve(&self, host: &str) -> Result<IpAddr, String> {
+        Ok(IpAddr::V4([127, 0, 0, 1].into()))
+    }
+}
 
 /**
  * Query is a query format for DNS communication
