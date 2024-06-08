@@ -1,5 +1,8 @@
 use std::fmt::Display;
-use std::net::{IpAddr, Ipv4Addr};
+use std::fs::File;
+use std::io::Read;
+use std::net::{IpAddr, Ipv4Addr, UdpSocket};
+use std::os::unix::net::SocketAddr;
 
 ///
 /// DNS resolver struct that resolve IP address for passed URL
@@ -11,7 +14,14 @@ impl Resolver {
         Self {}
     }
 
-    pub fn resolve(&self, host: &str) -> Result<IpAddr, String> {
+    pub fn resolve(&self, id: u16, host: &str) -> Result<IpAddr, String> {
+        let server_addr: Ipv4Addr = [8, 8, 8, 8].into();
+        let server = SocketAddr::from((server_addr, 53));
+        let client = SocketAddr::from(([0, 0, 0, 0], 0));
+        let sock = UdpSocket::bind(client).map_err(|err| err.to_string())?;
+        let query = Query::new(id, host);
+        sock.send_to(query.into(), server)
+            .map_err(|err| err.to_string());
         Ok(IpAddr::V4([127, 0, 0, 1].into()))
     }
 }
@@ -26,9 +36,9 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(id: u16, domain: &str) -> Self {
+    pub fn new(id: u16, host: &str) -> Self {
         let header = Header::new_query(id, 1);
-        let questions = vec![Question::new(domain, QueryType::A)];
+        let questions = vec![Question::new(host, QueryType::A)];
         Query { header, questions }
     }
 }
