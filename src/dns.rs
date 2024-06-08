@@ -49,6 +49,7 @@ pub struct Header {
     arcount: u16, // number of additional entries
 }
 
+#[allow(clippy::too_many_arguments)]
 impl Header {
     fn new(
         id: u16,
@@ -85,28 +86,26 @@ impl Header {
     }
 }
 
-impl Into<Vec<u8>> for Header {
-    fn into(self) -> Vec<u8> {
-        let mut header: Vec<u8> = Vec::new();
-        header.push((self.id >> 8) as u8);
-        header.push(self.id as u8);
-        header.push(
-            ((self.qr as u8) << 7)
-                | (self.opcode << 3)
-                | ((self.aa as u8) << 2)
-                | ((self.tc as u8) << 1)
-                | (self.rd as u8),
-        );
-        header.push((self.ra as u8) << 7 | (self.z << 4) | (self.rcode));
-        header.push((self.qdcount >> 8) as u8);
-        header.push(self.qdcount as u8);
-        header.push((self.ancount >> 8) as u8);
-        header.push(self.ancount as u8);
-        header.push((self.nscount >> 8) as u8);
-        header.push(self.nscount as u8);
-        header.push((self.arcount >> 8) as u8);
-        header.push(self.arcount as u8);
-        header
+impl From<Header> for Vec<u8> {
+    fn from(header: Header) -> Self {
+        vec![
+            (header.id >> 8) as u8,
+            header.id as u8,
+            ((header.qr as u8) << 7)
+                | (header.opcode << 3)
+                | ((header.aa as u8) << 2)
+                | ((header.tc as u8) << 1)
+                | (header.rd as u8),
+            (header.ra as u8) << 7 | (header.z << 4) | (header.rcode),
+            (header.qdcount >> 8) as u8,
+            header.qdcount as u8,
+            (header.ancount >> 8) as u8,
+            header.ancount as u8,
+            (header.nscount >> 8) as u8,
+            header.nscount as u8,
+            (header.arcount >> 8) as u8,
+            header.arcount as u8,
+        ]
     }
 }
 
@@ -147,22 +146,22 @@ impl Question {
     }
 }
 
-impl Into<Vec<u8>> for Question {
-    fn into(self) -> Vec<u8> {
-        let mut q = vec![];
-        for c in self.qname.split('.') {
-            q.push(c.len() as u8);
-            q.extend(c.bytes());
+impl From<Question> for Vec<u8> {
+    fn from(question: Question) -> Self {
+        let mut v = vec![];
+        for c in question.qname.split('.') {
+            v.push(c.len() as u8);
+            v.extend(c.bytes());
         }
-        q.push(0);
-        match self.qtype {
-            QueryType::A => q.extend_from_slice(&[0, 1]),
-            QueryType::AAAA => q.extend_from_slice(&[0, 28]),
+        v.push(0);
+        match question.qtype {
+            QueryType::A => v.extend_from_slice(&[0, 1]),
+            QueryType::AAAA => v.extend_from_slice(&[0, 28]),
         }
-        match self.qclass {
-            QueryClass::IN => q.extend_from_slice(&[0, 1]),
+        match question.qclass {
+            QueryClass::IN => v.extend_from_slice(&[0, 1]),
         }
-        q
+        v
     }
 }
 
@@ -370,7 +369,7 @@ impl TryFrom<(&[u8; 512], &mut usize)> for ResourceRecord {
             + ((bytes[*offset + 2] as u32) << 8)
             + (bytes[*offset + 3] as u32);
         *offset += 4;
-        let rdlength = (((bytes[*offset] as u16) << 8) + bytes[*offset + 1] as u16) as u16;
+        let rdlength = ((bytes[*offset] as u16) << 8) + bytes[*offset + 1] as u16;
         *offset += 2;
         let rdata = match query_type {
             QueryType::A => RData::A([
