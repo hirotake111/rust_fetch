@@ -1,8 +1,5 @@
 use std::fmt::Display;
-use std::fs::File;
-use std::io::Read;
-use std::net::{IpAddr, Ipv4Addr, UdpSocket};
-use std::os::unix::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr, UdpSocket};
 
 ///
 /// DNS resolver struct that resolve IP address for passed URL
@@ -15,14 +12,25 @@ impl Resolver {
     }
 
     pub fn resolve(&self, id: u16, host: &str) -> Result<IpAddr, String> {
-        let server_addr: Ipv4Addr = [8, 8, 8, 8].into();
-        let server = SocketAddr::from((server_addr, 53));
+        let server: SocketAddr = ([8, 8, 8, 8], 53).into();
         let client = SocketAddr::from(([0, 0, 0, 0], 0));
         let sock = UdpSocket::bind(client).map_err(|err| err.to_string())?;
         let query = Query::new(id, host);
-        sock.send_to(query.into(), server)
-            .map_err(|err| err.to_string());
-        Ok(IpAddr::V4([127, 0, 0, 1].into()))
+        // let buf: Vec<u8> = query.into();
+        sock.send_to(&Vec::from(query), server)
+            .map_err(|err| err.to_string())?;
+        let mut buf = [0; 512];
+        sock.recv_from(&mut buf).map_err(|err| err.to_string())?;
+        let response = Response::try_from(&buf)?;
+
+        if response.answers.len() > 0 {
+            match response.answers[0].rdata {
+                RData::A(v) => Ok(IpAddr::V4(v.into())),
+                RData::AAAA(_) => unimplemented!(),
+            }
+        } else {
+            Err("no answers in the DNS response from the server".to_string())
+        }
     }
 }
 
@@ -493,5 +501,13 @@ mod tests {
             )),
         );
         assert_eq!(offset, rr_payload.len());
+    }
+
+    #[test]
+    fn test_dns_resolver() {
+        let resolver = Resolver::new();
+        // FIXME: flaky test
+        let result = resolver.resolve(123, "example.com");
+        assert!(result.is_ok());
     }
 }

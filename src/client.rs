@@ -4,9 +4,6 @@ use std::{
     net::TcpStream,
 };
 
-// - client constructor
-// - URL parser
-// - client.get API
 use crate::dns;
 
 pub struct Client {

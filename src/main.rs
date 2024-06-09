@@ -9,7 +9,7 @@ fn main() {
         exit(1);
     });
     let client = client::new();
-    let response = client.get(url);
+    let response = client.get(url).unwrap();
 
     println!("{response}");
 }
