@@ -1,7 +1,9 @@
+#![allow(dead_code)]
+
 use std::{
     collections::HashMap,
     fmt::Display,
-    io::{BufRead, BufReader, Read},
+    io::{BufRead, BufReader, Read, Write},
     str::FromStr,
 };
 
@@ -56,12 +58,10 @@ impl<R: Read> TryFrom<BufReader<R>> for HTTPRequest {
 
     fn try_from(reader: BufReader<R>) -> Result<Self, Self::Error> {
         let mut iterator = reader.lines().map_while(Result::ok).peekable();
-        println!("created an iterator");
         let request_line = iterator
             .next()
             .ok_or("failed to get request line")?
             .parse()?;
-        println!("created an request line");
         let headers = HTTPHeaders::new(&mut iterator)?;
         let body = if iterator.peek().is_some() {
             Some(iterator.collect())
@@ -156,7 +156,7 @@ impl HTTPHeaders {
             if line.is_empty() {
                 break;
             }
-            let mut line = line.split(':');
+            let mut line = line.split(": ");
             let key = line.next().ok_or("failed to get key")?.trim().to_string();
             let value = line
                 .next()
@@ -233,7 +233,7 @@ impl FromStr for Method {
 pub struct HTTPResponse {
     status_line: StatusLine,
     headers: HTTPHeaders,
-    body: Option<String>,
+    pub body: Option<String>,
 }
 
 impl<R: Read> TryFrom<BufReader<R>> for HTTPResponse {
@@ -246,20 +246,27 @@ impl<R: Read> TryFrom<BufReader<R>> for HTTPResponse {
             .ok_or("failed to get status line")?
             .parse()?;
         let headers = HTTPHeaders::new(&mut iterator)?;
-        // let headers = if iterator.peek().is_some() {
-        //     Some(HTTPHeaders::new(&mut iterator)?)
-        // } else {
-        //     None
-        // };
-        let body = if iterator.peek().is_some() {
-            Some(iterator.collect())
-        } else {
-            None
-        };
+        let mut length = headers
+            .0
+            .get("Content-Length")
+            .ok_or("no content-length header in the respnse from the server")?
+            .parse::<usize>()
+            .map_err(|e| e.to_string())?;
+        let mut body = vec![];
+        for data in iterator {
+            println!("{}, {}", length, data.len());
+            println!("{}", data);
+            println!("{:?}", data.as_bytes());
+            if data.is_empty() || data.len() >= length {
+                break;
+            }
+            length -= data.len() + 1;
+            body.push(data);
+        }
         Ok(HTTPResponse {
             status_line,
             headers,
-            body,
+            body: Some(body.join("\n")),
         })
     }
 }

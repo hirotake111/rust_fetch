@@ -37,7 +37,7 @@ impl Client {
         let id = get_random_u16();
         let addr = self.dns_client.resolve(id, hostname)?;
         let protocol: Protocol = protocol.try_into()?;
-        println!("protocol: {:?}, ip address: {:?}", protocol, addr);
+        println!("protocol: {:?}, IP address: {:?}", protocol, addr);
         // connet to a server
         let mut stream = match protocol {
             Protocol::HTTP => TcpStream::connect((addr, 80)).map_err(|e| e.to_string())?,
@@ -52,12 +52,10 @@ impl Client {
         println!("sent {n} bytes");
         // receive HTTP request
         let reader = BufReader::new(stream);
-        println!("buf reader created");
         let response = HTTPResponse::try_from(reader)?;
         // let response = reader.
         // let payload: HTTPResponse = reader.lines().map_while(Result::ok).collect();
-        println!("{:?}", response);
-        Ok("done".to_string())
+        Ok(response.body.unwrap_or("".to_string()))
     }
 }
 
