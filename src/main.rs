@@ -1,16 +1,19 @@
-use rust_fetch::client;
+use rust_fetch::http::Method;
+use rust_fetch::Client;
 use std::process::exit;
 
 fn main() {
     let mut args = std::env::args();
     let program = args.next().unwrap();
-    let url = args.next().unwrap_or_else(|| {
+    if args.len() <= 1 {
         display_usage(&program);
         exit(1);
-    });
-    let client = client::new();
-    let response = client.get(url).unwrap();
-
+    }
+    let method: Method = args.next().unwrap().parse().unwrap();
+    let url = args.next().unwrap();
+    let body = args.next();
+    let client = Client::new();
+    let response = client.perform(method, url, body).unwrap();
     println!("{response}");
 }
 

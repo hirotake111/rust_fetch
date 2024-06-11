@@ -1,8 +1,27 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     io::{BufRead, BufReader, Read},
     str::FromStr,
 };
+
+#[derive(Debug, Clone)]
+pub enum Protocol {
+    HTTP,
+    HTTPS,
+}
+
+impl TryFrom<&str> for Protocol {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "http" => Ok(Protocol::HTTP),
+            "https" => Ok(Protocol::HTTPS),
+            _ => Err("invalid protocol schema".to_string()),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct HTTPRequest {
@@ -11,15 +30,38 @@ pub struct HTTPRequest {
     body: Option<String>,
 }
 
+impl HTTPRequest {
+    pub fn new(method: Method, hostname: &str, url: &str, body: Option<String>) -> Self {
+        let request_line = RequestLine::new(method, url);
+        let headers: HTTPHeaders = vec![("Host".to_string(), hostname.to_string())].into();
+        Self {
+            request_line,
+            headers,
+            body,
+        }
+    }
+}
+
+impl Display for HTTPRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.body {
+            Some(body) => write!(f, "{}{}\r\n{}\r\n", self.request_line, self.headers, body),
+            None => write!(f, "{}{}\r\n", self.request_line, self.headers),
+        }
+    }
+}
+
 impl<R: Read> TryFrom<BufReader<R>> for HTTPRequest {
     type Error = String;
 
     fn try_from(reader: BufReader<R>) -> Result<Self, Self::Error> {
         let mut iterator = reader.lines().map_while(Result::ok).peekable();
+        println!("created an iterator");
         let request_line = iterator
             .next()
             .ok_or("failed to get request line")?
             .parse()?;
+        println!("created an request line");
         let headers = HTTPHeaders::new(&mut iterator)?;
         let body = if iterator.peek().is_some() {
             Some(iterator.collect())
@@ -41,6 +83,27 @@ pub struct RequestLine {
     request_target: String,
     http_version: String,
 }
+
+impl RequestLine {
+    pub fn new(method: Method, url: &str) -> Self {
+        Self {
+            method,
+            request_target: url.to_string(),
+            http_version: "HTTP/1.1".to_string(),
+        }
+    }
+}
+
+impl Display for RequestLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {}\r\n",
+            self.method, self.request_target, self.http_version
+        )
+    }
+}
+
 impl FromStr for RequestLine {
     type Err = String;
 
@@ -68,6 +131,23 @@ impl FromStr for RequestLine {
 
 #[derive(Debug, Clone)]
 struct HTTPHeaders(HashMap<String, String>);
+
+impl From<Vec<(String, String)>> for HTTPHeaders {
+    fn from(value: Vec<(String, String)>) -> Self {
+        let hm = value.into_iter().collect::<HashMap<String, String>>();
+        HTTPHeaders(hm)
+    }
+}
+
+impl Display for HTTPHeaders {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::from("");
+        for (k, v) in &self.0 {
+            s += &format!("{}: {}\r\n", k, v);
+        }
+        write!(f, "{}", s)
+    }
+}
 
 impl HTTPHeaders {
     pub fn new(iterator: &mut impl Iterator<Item = String>) -> Result<HTTPHeaders, String> {
@@ -99,6 +179,37 @@ pub enum Method {
     CONNECT,
     TRACE,
 }
+
+impl Display for Method {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Method::GET => "GET",
+            Method::POST => "POST",
+            Method::PUT => "PUT",
+            Method::DELETE => "DELETE",
+            Method::HEAD => "HEAD",
+            Method::CONNECT => "CONNECT",
+            Method::TRACE => "TRACE",
+            Method::OPTIONS => "OPTIONS",
+        };
+        write!(f, "{}", s)
+    }
+}
+// impl Method {
+//     fn to_string(&self) -> String {
+//         let s = match self {
+//             Method::GET => "GET",
+//             Method::POST => "POST",
+//             Method::PUT => "PUT",
+//             Method::DELETE => "DELETE",
+//             Method::HEAD => "HEAD",
+//             Method::CONNECT => "CONNECT",
+//             Method::TRACE => "TRACE",
+//             Method::OPTIONS => "OPTIONS",
+//         };
+//         s.to_string()
+//     }
+// }
 
 impl FromStr for Method {
     type Err = String;
@@ -207,5 +318,38 @@ impl FromStr for StatusCode {
         s.parse::<u16>()
             .or(Err(format!("error parsing status code: {}", s)))
             .map(StatusCode)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_request_line_to_string() {
+        let req_line = RequestLine::new(Method::GET, "/hello");
+        assert_eq!(req_line.to_string(), "GET /hello HTTP/1.1\r\n".to_string());
+    }
+
+    #[test]
+    fn test_http_header_to_string() {
+        let headers = HTTPHeaders::from(vec![("foo".to_string(), "bar".to_string())]);
+        assert_eq!(headers.to_string(), "foo: bar\r\n".to_string());
+        let headers = HTTPHeaders::from(vec![
+            ("foo".to_string(), "bar".to_string()),
+            ("age".to_string(), "55".to_string()),
+        ]);
+        // assert_eq!(headers.to_string(), "foo: bar\r\nage: 55\r\n".to_string());
+        assert!(headers.to_string().contains("foo: bar\r\n"));
+        assert!(headers.to_string().contains("age: 55\r\n"));
+    }
+
+    #[test]
+    fn test_http_request_to_string() {
+        let req = HTTPRequest::new(Method::GET, "example.com", "/hello", None);
+        assert_eq!(
+            req.to_string(),
+            "GET /hello HTTP/1.1\r\nHost: example.com\r\n\r\n".to_string()
+        );
     }
 }
