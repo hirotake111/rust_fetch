@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     fmt::Display,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read},
     str::FromStr,
 };
 
@@ -277,6 +277,23 @@ pub struct StatusLine {
     status_code: StatusCode,
     status_text: String,
 }
+impl TryFrom<&Vec<u8>> for StatusLine {
+    type Error = String;
+
+    fn try_from(v: &Vec<u8>) -> Result<Self, Self::Error> {
+        let mut iterator = v.split(|b| *b == b' ');
+        let http_version: HTTPVersion = iterator
+            .next()
+            .ok_or("failed to get HTTP version")?
+            .try_into()?;
+        // let status_code: StatusCode = iterator
+        //     .next()
+        //     .ok_or("no status code to be parsed")?
+        //     .parse()?;
+
+        Err("error".to_string())
+    }
+}
 
 impl FromStr for StatusLine {
     type Err = String;
@@ -331,8 +348,21 @@ impl FromStr for HTTPVersion {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct StatusCode(u16);
+
+impl TryFrom<&[u8]> for StatusCode {
+    type Error = String;
+
+    fn try_from(v: &[u8]) -> Result<Self, Self::Error> {
+        String::from_utf8(v.to_vec())
+            .map_err(|e| e.to_string())?
+            .parse::<u16>()
+            .map_err(|e| e.to_string())
+            .map(StatusCode)
+    }
+}
+
 impl FromStr for StatusCode {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -381,5 +411,11 @@ mod tests {
             Ok(HTTPVersion(String::from("HTTP/1.1"))),
             HTTPVersion::try_from(v)
         );
+    }
+
+    #[test]
+    fn test_status_code_from_slice_u8() {
+        let slc: &[u8] = b"200";
+        assert_eq!(StatusCode::try_from(slc), Ok(StatusCode(200)));
     }
 }
