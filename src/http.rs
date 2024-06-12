@@ -303,8 +303,22 @@ impl FromStr for StatusLine {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct HTTPVersion(String);
+
+impl TryFrom<&[u8]> for HTTPVersion {
+    type Error = String;
+
+    fn try_from(v: &[u8]) -> Result<Self, Self::Error> {
+        let s = String::from_utf8(v.to_vec()).map_err(|e| e.to_string())?;
+        if s.starts_with("HTTP/") {
+            Ok(HTTPVersion(s))
+        } else {
+            Err(format!("invalid HTTP Version: {}", s))
+        }
+    }
+}
+
 impl FromStr for HTTPVersion {
     type Err = String;
 
@@ -357,6 +371,15 @@ mod tests {
         assert_eq!(
             req.to_string(),
             "GET /hello HTTP/1.1\r\nHost: example.com\r\n\r\n".to_string()
+        );
+    }
+
+    #[test]
+    fn test_http_version_from_vecu8() {
+        let v: &[u8] = b"HTTP/1.1";
+        assert_eq!(
+            Ok(HTTPVersion(String::from("HTTP/1.1"))),
+            HTTPVersion::try_from(v)
         );
     }
 }
