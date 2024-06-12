@@ -5,6 +5,7 @@ Currently it has limited capabilities as follows:
 
 - Limited HTTP/1.1 support (no keep-alive, etc.)
 - IPv4 support
+- no localhost lookup
 
 ## Usage in bash
 
