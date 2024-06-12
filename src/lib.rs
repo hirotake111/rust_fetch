@@ -36,7 +36,7 @@ impl Client {
     ) -> Result<String, String> {
         let (protocol, url) = url.split_once("://").unwrap_or(("http", &url));
         let (hostname, url) = match url.split_once('/') {
-            Some((hostname, url)) => (hostname, format!("{url}/")),
+            Some((hostname, url)) => (hostname, format!("/{url}")),
             None => (url, "/".to_string()),
         };
         // resove IP address
