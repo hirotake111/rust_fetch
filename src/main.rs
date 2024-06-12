@@ -1,5 +1,5 @@
-use rust_fetch::http::Method;
-use rust_fetch::Client;
+use fetch::http::Method;
+use fetch::Client;
 use std::process::exit;
 
 fn main() {
