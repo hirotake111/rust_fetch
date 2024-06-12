@@ -240,11 +240,11 @@ impl<R: Read> TryFrom<BufReader<R>> for HTTPResponse {
     type Error = String;
 
     fn try_from(reader: BufReader<R>) -> Result<Self, Self::Error> {
-        let mut iterator = reader.lines().map_while(Result::ok).peekable();
+        let mut iterator = reader.split(b'\n').map_while(Result::ok).peekable();
         let status_line: StatusLine = iterator
             .next()
             .ok_or("failed to get status line")?
-            .parse()?;
+            .try_into()?;
         let headers = HTTPHeaders::new(&mut iterator)?;
         let mut length = headers
             .0
@@ -277,21 +277,26 @@ pub struct StatusLine {
     status_code: StatusCode,
     status_text: String,
 }
-impl TryFrom<&Vec<u8>> for StatusLine {
+impl TryFrom<Vec<u8>> for StatusLine {
     type Error = String;
 
-    fn try_from(v: &Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(v: Vec<u8>) -> Result<Self, Self::Error> {
         let mut iterator = v.split(|b| *b == b' ');
-        let http_version: HTTPVersion = iterator
+        let http_version = iterator
             .next()
             .ok_or("failed to get HTTP version")?
             .try_into()?;
-        // let status_code: StatusCode = iterator
-        //     .next()
-        //     .ok_or("no status code to be parsed")?
-        //     .parse()?;
-
-        Err("error".to_string())
+        let status_code = iterator
+            .next()
+            .ok_or("no status code to be parsed")?
+            .try_into()?;
+        let status_text = iterator.next().ok_or("failed to get status text")?;
+        let status_text = String::from_utf8(status_text.to_vec()).map_err(|e| e.to_string())?;
+        Ok(StatusLine {
+            http_version,
+            status_code,
+            status_text,
+        })
     }
 }
 
