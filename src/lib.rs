@@ -21,6 +21,12 @@ impl Client {
     }
 }
 
+impl Default for Client {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Client {
     pub fn perform(
         &self,
@@ -29,7 +35,7 @@ impl Client {
         body: Option<String>,
     ) -> Result<String, String> {
         let (protocol, url) = url.split_once("://").unwrap_or(("http", &url));
-        let (hostname, url) = match url.split_once("/") {
+        let (hostname, url) = match url.split_once('/') {
             Some((hostname, url)) => (hostname, format!("{url}/")),
             None => (url, "/".to_string()),
         };
@@ -45,7 +51,7 @@ impl Client {
         };
         println!("connection established: {:?}", stream);
         // send HTTP request
-        let request = HTTPRequest::new(method, &hostname, &url, body);
+        let request = HTTPRequest::new(method, hostname, &url, body);
         let n = stream
             .write(request.to_string().as_bytes())
             .map_err(|e| e.to_string())?;
@@ -55,6 +61,7 @@ impl Client {
         let response = HTTPResponse::try_from(reader)?;
         // let response = reader.
         // let payload: HTTPResponse = reader.lines().map_while(Result::ok).collect();
+        println!("{:?}", response);
         Ok(response.body.unwrap_or("".to_string()))
     }
 }

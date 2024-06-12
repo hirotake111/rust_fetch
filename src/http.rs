@@ -62,7 +62,7 @@ impl<R: Read> TryFrom<BufReader<R>> for HTTPRequest {
             .next()
             .ok_or("failed to get request line")?
             .parse()?;
-        let headers = HTTPHeaders::new(&mut iterator)?;
+        let headers = HTTPHeaders::new_from_string_iter(&mut iterator)?;
         let body = if iterator.peek().is_some() {
             Some(iterator.collect())
         } else {
@@ -150,19 +150,31 @@ impl Display for HTTPHeaders {
 }
 
 impl HTTPHeaders {
-    pub fn new(iterator: &mut impl Iterator<Item = String>) -> Result<HTTPHeaders, String> {
+    pub fn new(iterator: &mut impl Iterator<Item = Vec<u8>>) -> Result<HTTPHeaders, String> {
+        let mut headers = HashMap::new();
+        for line in iterator {
+            if line.len() == 1 && line[0] == b'\r' {
+                break;
+            }
+            let line = String::from_utf8(line).map_err(|e| e.to_string())?;
+            if let Some((key, value)) = line.split_once(':') {
+                headers.insert(key.to_string(), value.trim().to_string());
+            }
+        }
+        Ok(HTTPHeaders(headers))
+    }
+
+    pub fn new_from_string_iter(
+        iterator: &mut impl Iterator<Item = String>,
+    ) -> Result<HTTPHeaders, String> {
         let mut headers = HashMap::new();
         for line in iterator {
             if line.is_empty() {
                 break;
             }
-            let mut line = line.split(": ");
-            let key = line.next().ok_or("failed to get key")?.trim().to_string();
-            let value = line
-                .next()
-                .ok_or(format!("failed to get value for key: {key}"))?
-                .to_string();
-            headers.insert(key, value);
+            if let Some((key, value)) = line.split_once(':') {
+                headers.insert(key.to_string(), value.trim().to_string());
+            }
         }
         Ok(HTTPHeaders(headers))
     }
@@ -246,27 +258,28 @@ impl<R: Read> TryFrom<BufReader<R>> for HTTPResponse {
             .ok_or("failed to get status line")?
             .try_into()?;
         let headers = HTTPHeaders::new(&mut iterator)?;
+        // println!("headers: {headers:?}");
         let mut length = headers
             .0
             .get("Content-Length")
-            .ok_or("no content-length header in the respnse from the server")?
+            .ok_or("HTTP header doesn't have Content-Length header in it")?
             .parse::<usize>()
             .map_err(|e| e.to_string())?;
         let mut body = vec![];
-        for data in iterator {
-            println!("{}, {}", length, data.len());
-            println!("{}", data);
-            println!("{:?}", data.as_bytes());
-            if data.is_empty() || data.len() >= length {
+        for mut data in iterator {
+            data.push(b'\n');
+            if data.len() >= length {
                 break;
             }
-            length -= data.len() + 1;
+            length -= data.len();
             body.push(data);
         }
+        let body = body.into_iter().flatten().collect::<Vec<u8>>();
+        let body = String::from_utf8(body).map_err(|e| e.to_string())?;
         Ok(HTTPResponse {
             status_line,
             headers,
-            body: Some(body.join("\n")),
+            body: Some(body),
         })
     }
 }

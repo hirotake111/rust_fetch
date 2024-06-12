@@ -4,6 +4,7 @@ use std::net::{IpAddr, SocketAddr, UdpSocket};
 ///
 /// DNS resolver struct that resolve IP address for passed URL
 ///
+#[derive(Default)]
 pub struct Resolver {}
 
 impl Resolver {
@@ -23,7 +24,7 @@ impl Resolver {
         sock.recv_from(&mut buf).map_err(|err| err.to_string())?;
         let response = Response::try_from(&buf)?;
 
-        if response.answers.len() > 0 {
+        if !response.answers.is_empty() {
             match response.answers[0].rdata {
                 RData::A(v) => Ok(IpAddr::V4(v.into())),
                 RData::AAAA(_) => unimplemented!(),
