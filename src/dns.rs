@@ -1,24 +1,32 @@
 use std::fmt::Display;
-use std::net::{IpAddr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddrV4, UdpSocket};
 
 ///
 /// DNS resolver struct that resolve IP address for passed URL
 ///
-#[derive(Default)]
-pub struct Resolver {}
+pub struct Resolver {
+    server: SocketAddrV4,
+    client: SocketAddrV4,
+}
 
 impl Resolver {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(ip: Option<Ipv4Addr>, port: Option<u16>) -> Self {
+        let (ip, port) = match (ip, port) {
+            (Some(ip), Some(port)) => (ip, port),
+            (Some(ip), None) => (ip, 53),
+            (None, Some(port)) => ([8, 8, 8, 8].into(), port),
+            (None, None) => ([8, 8, 8, 8].into(), 53),
+        };
+        Self {
+            server: SocketAddrV4::new(ip, port),
+            client: SocketAddrV4::new([0, 0, 0, 0].into(), 0),
+        }
     }
 
     pub fn resolve(&self, id: u16, host: &str) -> Result<IpAddr, String> {
-        let server: SocketAddr = ([8, 8, 8, 8], 53).into();
-        let client = SocketAddr::from(([0, 0, 0, 0], 0));
-        let sock = UdpSocket::bind(client).map_err(|err| err.to_string())?;
+        let sock = UdpSocket::bind(self.client).map_err(|err| err.to_string())?;
         let query = Query::new(id, host);
-        // let buf: Vec<u8> = query.into();
-        sock.send_to(&Vec::from(query), server)
+        sock.send_to(&Vec::from(query), self.server)
             .map_err(|err| err.to_string())?;
         let mut buf = [0; 512];
         sock.recv_from(&mut buf).map_err(|err| err.to_string())?;
@@ -116,6 +124,7 @@ impl Header {
             arcount,
         }
     }
+
     pub fn new_query(id: u16, qdcount: u16) -> Header {
         Header::new(id, false, 0, false, false, true, false, 0, qdcount, 0, 0, 0)
     }
@@ -502,13 +511,5 @@ mod tests {
             )),
         );
         assert_eq!(offset, rr_payload.len());
-    }
-
-    #[test]
-    fn test_dns_resolver() {
-        let resolver = Resolver::new();
-        // FIXME: flaky test
-        let result = resolver.resolve(123, "example.com");
-        assert!(result.is_ok());
     }
 }

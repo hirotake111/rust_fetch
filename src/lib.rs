@@ -16,7 +16,7 @@ pub struct Client {
 impl Client {
     pub fn new() -> Self {
         Self {
-            dns_client: dns::Resolver::new(),
+            dns_client: dns::Resolver::new(None, None),
         }
     }
 }
