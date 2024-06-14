@@ -268,11 +268,11 @@ impl<R: Read> TryFrom<BufReader<R>> for HTTPResponse {
         let mut body = vec![];
         for mut data in iterator {
             data.push(b'\n');
-            if data.len() >= length {
-                break;
-            }
             length -= data.len();
             body.push(data);
+            if length <= 0 {
+                break;
+            }
         }
         let body = body.into_iter().flatten().collect::<Vec<u8>>();
         let body = String::from_utf8(body).map_err(|e| e.to_string())?;
